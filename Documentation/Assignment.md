@@ -1,6 +1,6 @@
 # ECEN-361 Lab-02: Clocks, Timers, and Interrupts
 ### Winter-2025
-     Student Name:  Fill-in HERE
+     Student Name:  Bryant Van Orden
 
 
 ## Introduction and Objective of the Lab
@@ -77,7 +77,14 @@ Once you have all three LEDs blinking properly, answer the following questions:
 
 1. At what frequency does D1 toggle? [*answer here*]
 
+     D1 toggles at 1 Hz (Every second)
+
 2. Do all LEDs toggle at *exactly* the same time? [*answer here*]
+
+     No, each LED toggles at different intervals as configured:
+          D1: 1 second (1 Hz).
+          D2: 500 ms (2 Hz).
+          D3: 250 ms (4 Hz).
 
 ## Part 2: Changing the clock tree
 
@@ -94,9 +101,15 @@ Change the clock tree to adjust the rates at which the LEDs blink.
 
 1. What has happened to the speed of the timers? [*answer here*]
 
+The timers run slower due to the reduced input clock.
+
 2. What is the new frequency of LED D1? [*answer here*]
 
+D1 now toggles at 0.125 Hz (once every 8 seconds).
+
 3. When we changed the frequency, did the Seven-Segment Light update rate change?  (hint, look at the clocks driving the APB1, APB2 buses and which timers are on which bus.  Recall that the Seven-Segment timer is Tim17) [*answer here*]
+
+Yes, the Seven-Segment Light update rate also slowed down.
 
 ## Part 3: Reaction Timer (5 pts)
 
@@ -118,6 +131,133 @@ Code for this part is organized in the **ReactionTester.c** source file and **ma
 
 ```c
 /* Student Start HERE */
+  /************  STUDENT TO FILL IN HERE START *********************/
+
+    // Add your Timer Start for LED-D2 HERE
+    // Add your Timer Start for LED-D3 HERE
+  HAL_TIM_Base_Start_IT(&htim6);  // Start Timer for LED-D2
+  HAL_TIM_Base_Start_IT(&htim3);  // Start Timer for LED-D3
+  if (got_start_button) {
+      HAL_TIM_Base_Start(&htim3);  // Start the timer
+      got_start_button = false;
+  }
+  if (got_stop_button) {
+      HAL_TIM_Base_Stop(&htim3);  // Stop the timer
+      uint32_t elapsed_time = __HAL_TIM_GET_COUNTER(&htim3);
+      uint32_t elapsed_time_ms = elapsed_time / 1000;
+      MultiFunctionShield_Display(elapsed_time_ms);
+      got_stop_button = false;
+  }
+  HAL_Init();
+  SystemClock_Config();
+  MX_GPIO_Init();
+  MX_USART2_UART_Init();
+  MX_TIM17_Init();
+  MX_TIM16_Init();
+  MX_TIM3_Init();
+  MX_TIM6_Init();
+
+  /* Start Necessary Timers */
+  HAL_TIM_Base_Start_IT(&htim17); // 7-segment display timer
+  MultiFunctionShield_Clear();    // Clear the display
+
+
+
+  /************  STUDENT TO FILL IN HERE END   *********************/
+
+
+
+
+
+  MultiFunctionShield_Clear();
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  Clear_LEDs();
+  printf("\033\143");  // clear the terminal before printing
+  printf("Hello Lab-2 -- Timers and Interrupts \n\r\n\r");
+  srand((unsigned) uwTick );
+
+
+  while (1)
+  {
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+	  if (got_start_button && !timer_running)
+	      {
+	          got_start_button = false; // Reset flag
+	          waiting_for_signal = false;
+	          timer_running = true;
+
+	          // Show waiting signal
+	          MultiFunctionShield_Display(8888); // "Wait"
+	          HAL_GPIO_WritePin(LED_D1_GPIO_Port, LED_D1_Pin, GPIO_PIN_RESET);
+
+	          // Random delay (1-7 seconds)
+	          int random_delay_ms = (rand() % 7000) + 1000;
+	          HAL_Delay(random_delay_ms);
+
+	          // "Go" signal
+	          MultiFunctionShield_Clear();
+	          HAL_GPIO_WritePin(LED_D1_GPIO_Port, LED_D1_Pin, GPIO_PIN_SET);
+	          waiting_for_signal = true;
+
+	          // Start timer
+	          __HAL_TIM_SET_COUNTER(&htim3, 0); // Reset counter
+	          HAL_TIM_Base_Start(&htim3);
+	      }
+
+	      if (got_stop_button)
+	      {
+	          got_stop_button = false;
+
+	          if (!timer_running)
+	          {
+	              // Error: Stop button pressed prematurely
+	              MultiFunctionShield_Display(9999); // Error code
+	          }
+	          else
+	          {
+	              HAL_TIM_Base_Stop(&htim3); // Stop timer
+	              uint32_t elapsed_time = __HAL_TIM_GET_COUNTER(&htim3); // Get counter value
+	              uint32_t elapsed_time_ms = elapsed_time / 1000; // Convert to milliseconds
+
+	              if (waiting_for_signal)
+	              {
+	                  // Update fastest time if applicable
+	                  if (elapsed_time_ms < best_reaction_time_in_millisec)
+	                  {
+	                      best_reaction_time_in_millisec = elapsed_time_ms;
+	                  }
+
+	                  // Display reaction time
+	                  MultiFunctionShield_Display(elapsed_time_ms);
+
+	                  // Reset flags
+	                  waiting_for_signal = false;
+	                  timer_running = false;
+
+	                  // Turn off "Go" LED
+	                  HAL_GPIO_WritePin(LED_D1_GPIO_Port, LED_D1_Pin, GPIO_PIN_RESET);
+	              }
+	              else
+	              {
+	                  // Stop button pressed before "Go" signal
+	                  MultiFunctionShield_Display(9999); // Error code
+	              }
+	          }
+	      }
+
+	      if (got_fastest_button)
+	      {
+	          got_fastest_button = false;
+	          MultiFunctionShield_Display(best_reaction_time_in_millisec); // Show best time
+	      }
+  }
+  /* USER CODE END 3 */
+}
 
 /* Student End HERE */
 ```
@@ -140,3 +280,4 @@ For Seven Segment Display Functions, check the MultiFunctionShield.h header file
 * Currently, the reaction tester can have a wait time anywhere between 0 and 7000 milliseconds, Implement a minimum wait time in such a way that doesn't change the potential maximum wait time
 
 If you do any of these items - just mention what and how it worked, [*here*].
+I added the feature that it would display 9999 if you did it too early. I got it working so that it doesn't start with zero as wellit it has a mininmum wait time. 
